@@ -58,6 +58,9 @@ class Connection(object):
             insist=self.insist
         )
 
+    def close(self):
+        self.connection.close()
+
 
 class Consumer(object):
     def __init__(self, routing_key=DEFAULT_ROUTING_KEY,
@@ -93,12 +96,7 @@ class Consumer(object):
             exchange=self.exchange,
             routing_key=self.routing_key
         )
-        self.channel.basic_consume(
-            queue=self.queue,
-            no_ack=True,
-            callback=self.dispatch,
-            consumer_tag=str(uuid.uuid4())
-        )
+
 
     def close(self):
         if getattr(self, 'channel'):
@@ -106,7 +104,21 @@ class Consumer(object):
         if getattr(self, 'connection'):
             self.connection.close()
 
+    def get(self):
+        message = self.channel.basic_get()
+        if not message:
+            return None
+        decoded = simplejson.loads(message.body)
+        self.channel.basic_ack(message.delivery_tag)
+        return decoded['data']
+
     def wait(self):
+        self.channel.basic_consume(
+            queue=self.queue,
+            no_ack=True,
+            callback=self.dispatch,
+            consumer_tag=str(uuid.uuid4())
+        )
         while True:
             self.channel.wait()
 
